@@ -233,3 +233,46 @@ Vento — Local LLM Chat App Refactor Plan
        - Creating a second chat works independently
        - Swipe-to-delete removes a chat and its messages
        - Kill + reopen app: chats and history persist
+
+
+---
+
+Everything is in place. Here's a summary of what was built:
+
+  ---
+  Vento is implemented. tsc --noEmit passes clean. To build and run:
+     
+  eas build --profile development --platform android
+     
+  What was built:
+
+  File: store/db.ts
+  Purpose: SQLite schema + typed helpers for chats & messages                     
+  ────────────────────────────────────────
+  File: hooks/useLLM.ts 
+  Purpose: LLM lifecycle: download with progress, load, stream, reset
+  ────────────────────────────────────────
+  File: hooks/useChats.ts
+  Purpose: Chat CRUD backed by SQLite
+  ────────────────────────────────────────
+  File: components/ModelDownloadGate.tsx
+  Purpose: Full-screen gate: download from HuggingFace or import local .litertlm
+  ────────────────────────────────────────
+  File: components/ChatBubble.tsx
+  Purpose: User/assistant bubbles with streaming cursor
+  ────────────────────────────────────────
+  File: components/ChatInput.tsx
+  Purpose: Multiline input + send/stop button
+  ────────────────────────────────────────
+  File: app/index.tsx
+  Purpose: Chat list with "Vento" header, new chat button, long-press delete
+  ────────────────────────────────────────
+  File: app/chat/[id].tsx
+  Purpose: Chat screen with real-time streaming, auto-title from first message
+     
+  Key notes for testing:
+  - Requires an ARM64 Android device — no x86 emulator support
+  - First launch shows the download gate (2.6 GB — keep Wi-Fi on)
+  - "Use local file…" lets you pick a .litertlm already on the device (e.g. from Downloads)
+  - The AI's conversation context resets when you return to an old chat, but the message history is always
+  preserved visually`
