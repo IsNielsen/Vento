@@ -31,8 +31,10 @@ interface LLMContextValue {
   status: LLMStatus;
   downloadProgress: number;
   errorMessage: string | null;
+  modelFileExists: boolean;
   loadFromUrl: () => Promise<void>;
   loadFromLocalFile: (uri: string) => Promise<void>;
+  retryLoad: () => Promise<void>;
   generate: (text: string, onToken: (token: string, done: boolean) => void) => void;
   stop: () => void;
   resetForChat: () => Promise<void>;
@@ -46,6 +48,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<LLMStatus>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [modelFileExists, setModelFileExists] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const llmRef = useRef<any>(null);
   const isGeneratingRef = useRef(false);
@@ -54,7 +57,10 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true })
       .then(() => FileSystem.getInfoAsync(MODEL_PATH))
       .then(info => {
-        if (info.exists) loadModel(MODEL_PATH);
+        if (info.exists) {
+          setModelFileExists(true);
+          loadModel(MODEL_PATH);
+        }
       });
   }, []);
 
@@ -90,6 +96,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
       );
       const result = await downloadResumable.downloadAsync();
       if (!result) throw new Error('Download returned no result');
+      setModelFileExists(true);
       await loadModel(result.uri);
     } catch (err) {
       setErrorMessage(String(err));
@@ -104,12 +111,17 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     try {
       await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true });
       await FileSystem.copyAsync({ from: uri, to: MODEL_PATH });
+      setModelFileExists(true);
       setDownloadProgress(1);
       await loadModel(MODEL_PATH);
     } catch (err) {
       setErrorMessage(String(err));
       setStatus('error');
     }
+  }, []);
+
+  const retryLoad = useCallback(async () => {
+    await loadModel(MODEL_PATH);
   }, []);
 
   const generate = useCallback(
@@ -158,8 +170,10 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
         status,
         downloadProgress,
         errorMessage,
+        modelFileExists,
         loadFromUrl,
         loadFromLocalFile,
+        retryLoad,
         generate,
         stop,
         resetForChat,

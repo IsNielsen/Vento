@@ -6,13 +6,13 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useLLM } from '@/hooks/useLLM';
 
 export function ModelDownloadGate({ children }: { children: ReactNode }) {
-  const { status, downloadProgress, errorMessage, loadFromUrl, loadFromLocalFile, modelSizeMB, modelStoragePath } =
+  const { status, downloadProgress, errorMessage, modelFileExists, loadFromUrl, loadFromLocalFile, retryLoad, modelSizeMB, modelStoragePath } =
     useLLM();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const displayPath = modelStoragePath.replace('file://', '');
 
-  if (status === 'ready') return <>{children}</>;
+  if (status === 'ready' || status === 'generating') return <>{children}</>;
 
   const handlePickFile = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -62,14 +62,28 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
         </View>
       ) : (
         <View style={styles.actions}>
-          <Pressable
-            style={[styles.primary, { backgroundColor: colors.tint }]}
-            onPress={loadFromUrl}
-          >
-            <Text style={styles.primaryText}>
-              Download Gemma 4 E2B ({(modelSizeMB / 1024).toFixed(1)} GB)
-            </Text>
-          </Pressable>
+          {modelFileExists ? (
+            <>
+              <Pressable
+                style={[styles.primary, { backgroundColor: colors.tint }]}
+                onPress={retryLoad}
+              >
+                <Text style={styles.primaryText}>Retry Loading</Text>
+              </Pressable>
+              <Pressable onPress={loadFromUrl}>
+                <Text style={[styles.link, { color: colors.tint }]}>Re-download model…</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              style={[styles.primary, { backgroundColor: colors.tint }]}
+              onPress={loadFromUrl}
+            >
+              <Text style={styles.primaryText}>
+                Download Gemma 4 E2B ({(modelSizeMB / 1024).toFixed(1)} GB)
+              </Text>
+            </Pressable>
+          )}
           <Text style={[styles.pathLabel, { color: colors.textSecondary }]} numberOfLines={3}>
             {displayPath}
           </Text>
