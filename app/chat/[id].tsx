@@ -20,6 +20,10 @@ import {
 
 const STREAMING_ID = '__streaming__';
 
+function truncateTitle(s: string): string {
+  return [...s].slice(0, 40).join('');
+}
+
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -37,11 +41,16 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (!id) return;
-    listMessages(id).then(msgs => {
-      setMessages(msgs);
-      isFirstRef.current = msgs.length === 0;
-      if (msgs.length > 0) setTitle(msgs[0].content.slice(0, 40));
-    });
+    listMessages(id)
+      .then(msgs => {
+        setMessages(msgs);
+        isFirstRef.current = msgs.length === 0;
+        if (msgs.length > 0) {
+          const firstUser = msgs.find(m => m.role === 'user');
+          if (firstUser) setTitle(truncateTitle(firstUser.content));
+        }
+      })
+      .catch(err => console.error('Failed to load messages:', err));
     resetForChat();
   }, [id, resetForChat]);
 
@@ -58,15 +67,19 @@ export default function ChatScreen() {
       created_at: Date.now(),
     };
 
-    await addMessage(userMsg);
+    try {
+      await addMessage(userMsg);
 
-    if (isFirstRef.current) {
-      const newTitle = text.slice(0, 40);
-      await updateChatTitle(id, newTitle);
-      setTitle(newTitle);
-      isFirstRef.current = false;
+      if (isFirstRef.current) {
+        const newTitle = truncateTitle(text);
+        await updateChatTitle(id, newTitle);
+        setTitle(newTitle);
+        isFirstRef.current = false;
+      }
+      await updateChatTimestamp(id);
+    } catch (err) {
+      console.error('Failed to save user message:', err);
     }
-    await updateChatTimestamp(id);
 
     setMessages(prev => [...prev, userMsg]);
     setStreamingContent('');
@@ -84,8 +97,12 @@ export default function ChatScreen() {
           content: accumulated,
           created_at: Date.now(),
         };
-        await addMessage(assistantMsg);
-        await updateChatTimestamp(id);
+        try {
+          await addMessage(assistantMsg);
+          await updateChatTimestamp(id);
+        } catch (err) {
+          console.error('Failed to save assistant message:', err);
+        }
         setMessages(prev => [...prev, assistantMsg]);
         setStreamingContent('');
       }

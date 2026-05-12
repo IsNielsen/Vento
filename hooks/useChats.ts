@@ -6,8 +6,14 @@ export function useChats() {
   const [loaded, setLoaded] = useState(false);
 
   const reload = useCallback(async () => {
-    setChats(await listChats());
-    setLoaded(true);
+    try {
+      setChats(await listChats());
+    } catch (err) {
+      console.error('Failed to load chats:', err);
+      setChats([]);
+    } finally {
+      setLoaded(true);
+    }
   }, []);
 
   useEffect(() => {

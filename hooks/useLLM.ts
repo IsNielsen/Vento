@@ -52,6 +52,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const llmRef = useRef<any>(null);
   const isGeneratingRef = useRef(false);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true })
@@ -61,6 +62,10 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
           setModelFileExists(true);
           loadModel(MODEL_PATH);
         }
+      })
+      .catch(err => {
+        setErrorMessage(String(err));
+        setStatus('error');
       });
   }, []);
 
@@ -79,6 +84,8 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
   };
 
   const loadFromUrl = useCallback(async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setStatus('downloading');
     setDownloadProgress(0);
     setErrorMessage(null);
@@ -90,7 +97,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
         {},
         ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
           if (totalBytesExpectedToWrite > 0) {
-            setDownloadProgress(totalBytesWritten / totalBytesExpectedToWrite);
+            setDownloadProgress(Math.min(totalBytesWritten / totalBytesExpectedToWrite, 1));
           }
         }
       );
@@ -101,10 +108,14 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     } catch (err) {
       setErrorMessage(String(err));
       setStatus('error');
+    } finally {
+      isLoadingRef.current = false;
     }
   }, []);
 
   const loadFromLocalFile = useCallback(async (uri: string) => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setStatus('downloading');
     setDownloadProgress(0);
     setErrorMessage(null);
@@ -117,6 +128,8 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     } catch (err) {
       setErrorMessage(String(err));
       setStatus('error');
+    } finally {
+      isLoadingRef.current = false;
     }
   }, []);
 
@@ -132,7 +145,14 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
       setStatus('generating');
       try {
         llm.sendMessageAsync(text, (token: string, done: boolean) => {
-          onToken(token, done);
+          try {
+            onToken(token, done);
+          } catch (callbackErr) {
+            isGeneratingRef.current = false;
+            setErrorMessage(String(callbackErr));
+            setStatus('error');
+            return;
+          }
           if (done) {
             isGeneratingRef.current = false;
             setStatus('ready');

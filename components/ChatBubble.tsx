@@ -23,7 +23,7 @@ export function ChatBubble({ role, content, isStreaming }: Props) {
             : [styles.assistantBubble, { backgroundColor: colors.assistantBubble }],
         ]}
       >
-        <Text style={[styles.text, { color: isUser ? '#FFFFFF' : colors.text }]}>
+        <Text style={[styles.text, { color: isUser ? colors.userBubbleText : colors.text }]}>
           {content || (isStreaming ? '' : '…')}
           {isStreaming && <Text style={{ color: colors.tint }}>▋</Text>}
         </Text>

@@ -3,7 +3,8 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View, Text } from 'react-native';
 import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { LLMProvider } from '@/hooks/useLLM';
@@ -23,6 +24,8 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  const [dbReady, setDbReady] = useState(false);
+  const [dbError, setDbError] = useState(false);
 
   useEffect(() => {
     if (error) throw error;
@@ -31,12 +34,26 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       initDb()
-        .catch(console.error)
+        .then(() => setDbReady(true))
+        .catch(err => {
+          console.error('Database initialization failed:', err);
+          setDbError(true);
+        })
         .finally(() => SplashScreen.hideAsync());
     }
   }, [loaded]);
 
-  if (!loaded) return null;
+  if (!loaded || (!dbReady && !dbError)) return null;
+
+  if (dbError) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <Text style={{ fontSize: 16, textAlign: 'center', color: '#EF4444' }}>
+          Failed to open database. Please restart the app.
+        </Text>
+      </View>
+    );
+  }
 
   return <RootLayoutNav />;
 }

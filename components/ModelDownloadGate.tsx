@@ -15,16 +15,21 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
   if (status === 'ready' || status === 'generating') return <>{children}</>;
 
   const handlePickFile = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: '*/*',
-      copyToCacheDirectory: false,
-    });
-    if (!result.canceled && result.assets[0]) {
-      await loadFromLocalFile(result.assets[0].uri);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: false,
+      });
+      if (!result.canceled && result.assets[0]) {
+        await loadFromLocalFile(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Document picker error:', err);
     }
   };
 
-  const progressMB = Math.round(downloadProgress * modelSizeMB);
+  const clampedProgress = Math.min(downloadProgress, 1);
+  const progressMB = Math.round(clampedProgress * modelSizeMB);
   const isActive = status === 'downloading' || status === 'loading';
 
   return (
@@ -49,7 +54,7 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
             <View
               style={[
                 styles.fill,
-                { backgroundColor: colors.tint, width: `${downloadProgress * 100}%` },
+                { backgroundColor: colors.tint, width: `${clampedProgress * 100}%` },
               ]}
             />
           </View>

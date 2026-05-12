@@ -1,4 +1,4 @@
-export default {
+const Colors = {
   light: {
     text: '#1A1A2E',
     background: '#F8F9FA',
@@ -8,6 +8,7 @@ export default {
     surface: '#FFFFFF',
     textSecondary: '#6B7280',
     userBubble: '#4F8EF7',
+    userBubbleText: '#FFFFFF',
     assistantBubble: '#FFFFFF',
     inputBorder: '#E5E7EB',
   },
@@ -20,7 +21,10 @@ export default {
     surface: '#1E293B',
     textSecondary: '#94A3B8',
     userBubble: '#1D4ED8',
+    userBubbleText: '#FFFFFF',
     assistantBubble: '#1E293B',
     inputBorder: '#334155',
   },
-};
+} as const;
+
+export default Colors;

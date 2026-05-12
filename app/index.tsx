@@ -20,17 +20,21 @@ export default function HomeScreen() {
 
   const handleNewChat = useCallback(async () => {
     const id = Crypto.randomUUID();
-    await create(id, 'New chat');
-    router.push(`/chat/${id}` as never);
+    try {
+      await create(id, 'New chat');
+      router.push({ pathname: '/chat/[id]', params: { id } });
+    } catch (err) {
+      console.error('Failed to create chat:', err);
+    }
   }, [create, router]);
 
   useEffect(() => {
     if (!hasAutoOpened.current && loaded && chats.length === 0) {
       hasAutoOpened.current = true;
       const id = Crypto.randomUUID();
-      create(id, 'New chat').then(() => {
-        router.replace(`/chat/${id}` as never);
-      });
+      create(id, 'New chat')
+        .then(() => router.replace({ pathname: '/chat/[id]', params: { id } }))
+        .catch(err => console.error('Failed to create initial chat:', err));
     }
   }, [loaded, chats.length, create, router]);
 
@@ -41,7 +45,7 @@ export default function HomeScreen() {
           styles.row,
           { borderBottomColor: colors.inputBorder, backgroundColor: pressed ? colors.surface : 'transparent' },
         ]}
-        onPress={() => router.push(`/chat/${item.id}` as never)}
+        onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
         onLongPress={() => remove(item.id)}
       >
         <View style={styles.rowContent}>
