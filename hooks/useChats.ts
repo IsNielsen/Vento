@@ -3,9 +3,11 @@ import { createChat, deleteChat, listChats, type Chat } from '@/store/db';
 
 export function useChats() {
   const [chats, setChats] = useState<Chat[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   const reload = useCallback(async () => {
     setChats(await listChats());
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -28,5 +30,5 @@ export function useChats() {
     [reload]
   );
 
-  return { chats, reload, create, remove };
+  return { chats, loaded, reload, create, remove };
 }

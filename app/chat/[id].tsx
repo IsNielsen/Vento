@@ -1,6 +1,7 @@
 import { View, FlatList, StyleSheet, Text, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as Crypto from 'expo-crypto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
@@ -50,7 +51,7 @@ export default function ChatScreen() {
     setInput('');
 
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: Crypto.randomUUID(),
       chat_id: id,
       role: 'user',
       content: text,
@@ -77,7 +78,7 @@ export default function ChatScreen() {
 
       if (done) {
         const assistantMsg: Message = {
-          id: crypto.randomUUID(),
+          id: Crypto.randomUUID(),
           chat_id: id,
           role: 'model',
           content: accumulated,

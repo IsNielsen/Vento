@@ -1,6 +1,7 @@
 import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import * as Crypto from 'expo-crypto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
@@ -14,13 +15,24 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { chats, create, remove } = useChats();
+  const { chats, loaded, create, remove } = useChats();
+  const hasAutoOpened = useRef(false);
 
   const handleNewChat = useCallback(async () => {
-    const id = crypto.randomUUID();
+    const id = Crypto.randomUUID();
     await create(id, 'New chat');
     router.push(`/chat/${id}` as never);
   }, [create, router]);
+
+  useEffect(() => {
+    if (!hasAutoOpened.current && loaded && chats.length === 0) {
+      hasAutoOpened.current = true;
+      const id = Crypto.randomUUID();
+      create(id, 'New chat').then(() => {
+        router.replace(`/chat/${id}` as never);
+      });
+    }
+  }, [loaded, chats.length, create, router]);
 
   const renderItem = useCallback(
     ({ item }: { item: Chat }) => (
