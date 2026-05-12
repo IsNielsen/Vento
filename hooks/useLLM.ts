@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -16,7 +17,12 @@ const { createLLM } = require('react-native-litert-lm');
 
 const MODEL_FILENAME = 'gemma-4-E2B-it.litertlm';
 const MODEL_URL = `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/${MODEL_FILENAME}`;
-const MODEL_PATH = `${FileSystem.documentDirectory}${MODEL_FILENAME}`;
+// Android/media/<package>/ is visible to other apps without special permissions (scoped storage)
+const MODEL_DIR =
+  Platform.OS === 'android'
+    ? 'file:///storage/emulated/0/Android/media/com.quoth.vento/files/models/'
+    : FileSystem.documentDirectory!;
+const MODEL_PATH = `${MODEL_DIR}${MODEL_FILENAME}`;
 const MODEL_SIZE_MB = 2580;
 
 export type LLMStatus = 'idle' | 'downloading' | 'loading' | 'ready' | 'generating' | 'error';
@@ -44,9 +50,11 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
   const isGeneratingRef = useRef(false);
 
   useEffect(() => {
-    FileSystem.getInfoAsync(MODEL_PATH).then(info => {
-      if (info.exists) loadModel(MODEL_PATH);
-    });
+    FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true })
+      .then(() => FileSystem.getInfoAsync(MODEL_PATH))
+      .then(info => {
+        if (info.exists) loadModel(MODEL_PATH);
+      });
   }, []);
 
   const loadModel = async (path: string) => {
@@ -68,6 +76,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     setDownloadProgress(0);
     setErrorMessage(null);
     try {
+      await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true });
       const downloadResumable = FileSystem.createDownloadResumable(
         MODEL_URL,
         MODEL_PATH,
@@ -92,6 +101,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     setDownloadProgress(0);
     setErrorMessage(null);
     try {
+      await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true });
       await FileSystem.copyAsync({ from: uri, to: MODEL_PATH });
       setDownloadProgress(1);
       await loadModel(MODEL_PATH);
