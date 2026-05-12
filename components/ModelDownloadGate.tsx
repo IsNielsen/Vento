@@ -6,10 +6,11 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useLLM } from '@/hooks/useLLM';
 
 export function ModelDownloadGate({ children }: { children: ReactNode }) {
-  const { status, downloadProgress, errorMessage, loadFromUrl, loadFromLocalFile, modelSizeMB } =
+  const { status, downloadProgress, errorMessage, loadFromUrl, loadFromLocalFile, modelSizeMB, modelStoragePath } =
     useLLM();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const displayPath = modelStoragePath.replace('file://', '');
 
   if (status === 'ready') return <>{children}</>;
 
@@ -52,6 +53,9 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
               ]}
             />
           </View>
+          <Text style={[styles.pathLabel, { color: colors.textSecondary }]} numberOfLines={3}>
+            {displayPath}
+          </Text>
           <Pressable onPress={handlePickFile}>
             <Text style={[styles.link, { color: colors.tint }]}>Use a local file instead…</Text>
           </Pressable>
@@ -66,6 +70,9 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
               Download Gemma 4 E2B ({(modelSizeMB / 1024).toFixed(1)} GB)
             </Text>
           </Pressable>
+          <Text style={[styles.pathLabel, { color: colors.textSecondary }]} numberOfLines={3}>
+            {displayPath}
+          </Text>
           <Pressable onPress={handlePickFile}>
             <Text style={[styles.link, { color: colors.tint }]}>Use a local file…</Text>
           </Pressable>
@@ -118,6 +125,11 @@ const styles = StyleSheet.create({
   link: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  pathLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+    fontFamily: 'monospace',
   },
   progressSection: {
     width: '100%',

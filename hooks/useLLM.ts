@@ -16,12 +16,14 @@ const { createLLM } = require('react-native-litert-lm');
 
 const MODEL_FILENAME = 'gemma-4-E2B-it.litertlm';
 const MODEL_URL = `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/${MODEL_FILENAME}`;
-const MODEL_DIR =
-  Platform.OS === 'android'
-    ? 'file:///storage/emulated/0/Android/media/com.quoth.vento/files/models/'
-    : `${FileSystem.documentDirectory}models/`;
+const MODEL_DIR = `${FileSystem.documentDirectory}models/`;
 const MODEL_PATH = `${MODEL_DIR}${MODEL_FILENAME}`;
 const MODEL_SIZE_MB = 2580;
+
+// LiteRT-LM SDK expects plain filesystem paths, not file:// URIs
+function toSdkPath(uri: string): string {
+  return Platform.OS === 'android' ? uri.replace('file://', '') : uri;
+}
 
 export type LLMStatus = 'idle' | 'downloading' | 'loading' | 'ready' | 'generating' | 'error';
 
@@ -35,6 +37,7 @@ interface LLMContextValue {
   stop: () => void;
   resetForChat: () => Promise<void>;
   modelSizeMB: number;
+  modelStoragePath: string;
 }
 
 const LLMContext = createContext<LLMContextValue | null>(null);
@@ -60,7 +63,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     setErrorMessage(null);
     try {
       const llm = createLLM();
-      await llm.loadModel(path, { backend: 'cpu' });
+      await llm.loadModel(toSdkPath(path), { backend: 'cpu' });
       llmRef.current = llm;
       setStatus('ready');
     } catch (err) {
@@ -161,6 +164,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
         stop,
         resetForChat,
         modelSizeMB: MODEL_SIZE_MB,
+        modelStoragePath: MODEL_PATH,
       },
     },
     children
