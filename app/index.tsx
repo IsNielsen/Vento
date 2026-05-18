@@ -1,135 +1,156 @@
-import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
-import * as Crypto from 'expo-crypto';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, TextInput, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useChats } from '@/hooks/useChats';
-import { type Chat } from '@/store/db';
+import * as Clipboard from 'expo-clipboard';
+import { useLLM } from '@/hooks/useLLM';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useTranscription } from '@/hooks/useTranscription';
+import WaveformVisualizer from '@/components/WaveformVisualizer';
+import RecordButton from '@/components/RecordButton';
+
+type ScreenState = 'idle' | 'waiting-model' | 'recording' | 'stopped';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-  const { chats, loaded, create, remove } = useChats();
-  const hasAutoOpened = useRef(false);
+  const { status, transcribeAudio, loadFromUrl } = useLLM();
+  const { amplitude, duration, startRecording, stopAndGetChunk, requestPermission } = useAudioRecorder();
+  const { transcript, isTranscribing, setIsTranscribing, appendTranscript, setTranscript } = useTranscription();
 
-  const handleNewChat = useCallback(async () => {
-    const id = Crypto.randomUUID();
+  const [screenState, setScreenState] = useState<ScreenState>('idle');
+  const [copied, setCopied] = useState(false);
+
+  const isRecordingRef = useRef(false);
+  const chunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const transcribeChunk = useCallback(async (chunkPath: string) => {
+    setIsTranscribing(true);
     try {
-      await create(id, 'New chat');
-      router.push({ pathname: '/chat/[id]', params: { id } });
+      const text = await transcribeAudio(chunkPath);
+      appendTranscript(text);
     } catch (err) {
-      console.error('Failed to create chat:', err);
+      console.warn('Chunk transcription failed:', err);
+    } finally {
+      setIsTranscribing(false);
     }
-  }, [create, router]);
+  }, [transcribeAudio, appendTranscript, setIsTranscribing]);
+
+  const runChunkCycle = useCallback(async () => {
+    if (!isRecordingRef.current) return;
+
+    const chunkPath = await stopAndGetChunk();
+
+    if (isRecordingRef.current) {
+      await startRecording();
+    }
+
+    if (chunkPath && isRecordingRef.current) {
+      await transcribeChunk(chunkPath);
+    }
+
+    if (isRecordingRef.current) {
+      chunkTimerRef.current = setTimeout(runChunkCycle, 3500);
+    }
+  }, [stopAndGetChunk, startRecording, transcribeChunk]);
+
+  const beginRecording = useCallback(async () => {
+    await startRecording();
+    isRecordingRef.current = true;
+    setScreenState('recording');
+    chunkTimerRef.current = setTimeout(runChunkCycle, 3500);
+  }, [startRecording, runChunkCycle]);
+
+  const handleRecordPress = useCallback(async () => {
+    if (screenState === 'recording') {
+      isRecordingRef.current = false;
+      if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
+      const finalChunk = await stopAndGetChunk();
+      if (finalChunk) await transcribeChunk(finalChunk);
+      setScreenState('stopped');
+      return;
+    }
+
+    if (status !== 'ready') {
+      setScreenState('waiting-model');
+      loadFromUrl();
+      return;
+    }
+
+    const granted = await requestPermission();
+    if (!granted) return;
+    await beginRecording();
+  }, [screenState, status, loadFromUrl, requestPermission, stopAndGetChunk, transcribeChunk, beginRecording]);
 
   useEffect(() => {
-    if (!hasAutoOpened.current && loaded && chats.length === 0) {
-      hasAutoOpened.current = true;
-      const id = Crypto.randomUUID();
-      create(id, 'New chat')
-        .then(() => router.replace({ pathname: '/chat/[id]', params: { id } }))
-        .catch(err => console.error('Failed to create initial chat:', err));
+    if (status === 'ready' && screenState === 'waiting-model') {
+      (async () => {
+        const granted = await requestPermission();
+        if (!granted) { setScreenState('idle'); return; }
+        await beginRecording();
+      })();
     }
-  }, [loaded, chats.length, create, router]);
+  }, [status, screenState, requestPermission, beginRecording]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: Chat }) => (
-      <Pressable
-        style={({ pressed }) => [
-          styles.row,
-          { borderBottomColor: colors.inputBorder, backgroundColor: pressed ? colors.surface : 'transparent' },
-        ]}
-        onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
-        onLongPress={() => remove(item.id)}
-      >
-        <View style={styles.rowContent}>
-          <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={[styles.rowTime, { color: colors.textSecondary }]}>
-            {formatRelative(item.updated_at)}
-          </Text>
-        </View>
-        <FontAwesome name="chevron-right" size={12} color={colors.textSecondary} />
-      </Pressable>
-    ),
-    [colors, router, remove]
-  );
+  const handleCopy = useCallback(async () => {
+    await Clipboard.setStringAsync(transcript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [transcript]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.inputBorder }]}>
-        <Text style={[styles.logo, { color: colors.tint }]}>Vento</Text>
-        <Pressable hitSlop={16} onPress={handleNewChat}>
-          <FontAwesome name="pencil" size={20} color={colors.tint} />
-        </Pressable>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0D0720' }}>
+      <StatusBar style="light" />
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16 }}>
+        <Text style={{ color: '#00F5FF', fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>VENTO</Text>
+        {transcript.length > 0 && (
+          <Pressable onPress={handleCopy} style={{ padding: 8 }}>
+            <Text style={{ color: copied ? '#00F5FF' : '#A78BFA', fontSize: 14, fontWeight: '600' }}>
+              {copied ? 'Copied!' : 'Copy'}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      {chats.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No conversations yet</Text>
-          <Text style={[styles.emptyHint, { color: colors.textSecondary }]}>
-            Tap the pencil icon to start
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={chats}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: insets.bottom }}
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 32 }}>
+        <WaveformVisualizer amplitude={amplitude} isActive={screenState === 'recording'} />
+        <RecordButton
+          isRecording={screenState === 'recording'}
+          isLoading={status === 'loading' || status === 'downloading' || screenState === 'waiting-model' || isTranscribing}
+          onPress={handleRecordPress}
+          amplitude={amplitude}
         />
-      )}
-    </View>
+        {screenState === 'recording' && (
+          <Text style={{ color: '#94A3B8', fontSize: 13 }}>
+            {Math.floor(duration / 60).toString().padStart(2, '0')}:{Math.floor(duration % 60).toString().padStart(2, '0')}
+          </Text>
+        )}
+        {screenState === 'idle' && (
+          <Text style={{ color: '#94A3B8', fontSize: 14, letterSpacing: 1 }}>TAP TO TRANSCRIBE</Text>
+        )}
+      </View>
+
+      <View style={{ paddingHorizontal: 24, paddingBottom: 32, maxHeight: '40%' }}>
+        <TextInput
+          multiline
+          value={transcript}
+          onChangeText={setTranscript}
+          placeholder="Your transcription will appear here..."
+          placeholderTextColor="#4B5563"
+          style={{
+            color: '#F8FAFC',
+            fontSize: 16,
+            lineHeight: 24,
+            minHeight: 80,
+            maxHeight: 200,
+            padding: 16,
+            backgroundColor: '#1A0B4B',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: isTranscribing ? '#00F5FF' : '#2D1B69',
+            textAlignVertical: 'top',
+          }}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
-
-function formatRelative(ts: number): string {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return 'Just now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return new Date(ts).toLocaleDateString();
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  logo: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  rowContent: { flex: 1 },
-  rowTitle: { fontSize: 16, fontWeight: '500', marginBottom: 2 },
-  rowTime: { fontSize: 12 },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: '600' },
-  emptyHint: { fontSize: 14 },
-});
