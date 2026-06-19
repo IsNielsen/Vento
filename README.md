@@ -4,6 +4,12 @@ A privacy-first chat app that runs an LLM entirely on-device — no cloud, no ac
 
 Built with Expo (SDK 54, New Architecture) and powered by [Gemma 4 E2B](https://huggingface.co/google/gemma-3n-E2B-it-litert-preview) via `react-native-litert-lm`.
 
+
+
+https://github.com/user-attachments/assets/381d97af-30de-4182-bc59-95f6f67090cd
+
+
+
 ## Features
 
 - Fully offline inference — the model runs locally via LiteRT
