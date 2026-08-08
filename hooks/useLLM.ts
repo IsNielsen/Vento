@@ -25,7 +25,7 @@ function toSdkPath(uri: string): string {
   return Platform.OS === 'android' ? uri.replace('file://', '') : uri;
 }
 
-export type LLMStatus = 'idle' | 'downloading' | 'loading' | 'ready' | 'generating' | 'error';
+export type LLMStatus = 'idle' | 'downloading' | 'loading' | 'ready' | 'error';
 
 interface LLMContextValue {
   status: LLMStatus;
@@ -35,9 +35,7 @@ interface LLMContextValue {
   loadFromUrl: () => Promise<void>;
   loadFromLocalFile: (uri: string) => Promise<void>;
   retryLoad: () => Promise<void>;
-  generate: (text: string, onToken: (token: string, done: boolean) => void) => void;
-  stop: () => void;
-  resetForChat: () => Promise<void>;
+  transcribeAudio: (audioPath: string) => Promise<string>;
   modelSizeMB: number;
   modelStoragePath: string;
 }
@@ -51,7 +49,6 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
   const [modelFileExists, setModelFileExists] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const llmRef = useRef<any>(null);
-  const isGeneratingRef = useRef(false);
   const isLoadingRef = useRef(false);
 
   useEffect(() => {
@@ -137,50 +134,20 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
     await loadModel(MODEL_PATH);
   }, []);
 
-  const generate = useCallback(
-    (text: string, onToken: (token: string, done: boolean) => void) => {
-      const llm = llmRef.current;
-      if (!llm || isGeneratingRef.current) return;
-      isGeneratingRef.current = true;
-      setStatus('generating');
-      try {
-        llm.sendMessageAsync(text, (token: string, done: boolean) => {
-          try {
-            onToken(token, done);
-          } catch (callbackErr) {
-            isGeneratingRef.current = false;
-            setErrorMessage(String(callbackErr));
-            setStatus('error');
-            return;
-          }
-          if (done) {
-            isGeneratingRef.current = false;
-            setStatus('ready');
-          }
-        });
-      } catch (err) {
-        isGeneratingRef.current = false;
-        setErrorMessage(String(err));
-        setStatus('error');
-      }
-    },
-    []
-  );
-
-  const stop = useCallback(() => {
-    const llm = llmRef.current;
-    if (llm && typeof llm.stopGeneration === 'function') {
-      llm.stopGeneration();
+  const transcribeAudio = useCallback(async (audioPath: string): Promise<string> => {
+    if (Platform.OS !== 'android') {
+      throw new Error('Audio transcription requires Android (iOS XCFramework lacks audio executor in litert-lm v0.3.7)');
     }
-    isGeneratingRef.current = false;
-    setStatus('ready');
-  }, []);
-
-  const resetForChat = useCallback(async () => {
     const llm = llmRef.current;
-    if (llm && typeof llm.resetConversation === 'function') {
+    if (!llm) throw new Error('Model not loaded');
+    if (typeof llm.resetConversation === 'function') {
       await llm.resetConversation();
     }
+    const sdkPath = toSdkPath(audioPath);
+    return llm.sendMessageWithAudio(
+      'Transcribe the speech in this audio exactly as spoken. Return only the spoken words, no commentary.',
+      sdkPath
+    );
   }, []);
 
   return createElement(
@@ -194,9 +161,7 @@ function LLMProviderInner({ children }: { children: ReactNode }) {
         loadFromUrl,
         loadFromLocalFile,
         retryLoad,
-        generate,
-        stop,
-        resetForChat,
+        transcribeAudio,
         modelSizeMB: MODEL_SIZE_MB,
         modelStoragePath: MODEL_PATH,
       },

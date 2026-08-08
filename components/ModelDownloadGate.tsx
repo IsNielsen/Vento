@@ -12,7 +12,7 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
   const colors = Colors[colorScheme];
   const displayPath = modelStoragePath.replace('file://', '');
 
-  if (status === 'ready' || status === 'generating') return <>{children}</>;
+  if (status === 'ready') return <>{children}</>;
 
   const handlePickFile = async () => {
     try {
@@ -34,10 +34,8 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.logo, { color: colors.tint }]}>Vento</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Local AI · No cloud · No data sent
-      </Text>
+      <Text style={styles.logo}>Vento</Text>
+      <Text style={styles.subtitle}>On-device Voice Transcription</Text>
 
       {status === 'error' && (
         <Text style={styles.error}>{errorMessage}</Text>
@@ -45,12 +43,12 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
 
       {isActive ? (
         <View style={styles.progressSection}>
-          <Text style={[styles.progressLabel, { color: colors.text }]}>
+          <Text style={styles.progressLabel}>
             {status === 'loading'
               ? 'Loading model…'
               : `Downloading… ${progressMB} / ${modelSizeMB} MB`}
           </Text>
-          <View style={[styles.track, { backgroundColor: colors.inputBorder }]}>
+          <View style={[styles.track, { backgroundColor: colors.surface }]}>
             <View
               style={[
                 styles.fill,
@@ -58,11 +56,11 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
               ]}
             />
           </View>
-          <Text style={[styles.pathLabel, { color: colors.textSecondary }]} numberOfLines={3}>
+          <Text style={styles.pathLabel} numberOfLines={3}>
             {displayPath}
           </Text>
           <Pressable onPress={handlePickFile}>
-            <Text style={[styles.link, { color: colors.tint }]}>Use a local file instead…</Text>
+            <Text style={styles.link}>Use a local file instead…</Text>
           </Pressable>
         </View>
       ) : (
@@ -70,18 +68,18 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
           {modelFileExists ? (
             <>
               <Pressable
-                style={[styles.primary, { backgroundColor: colors.tint }]}
+                style={[styles.primary, styles.primaryGlow]}
                 onPress={retryLoad}
               >
                 <Text style={styles.primaryText}>Retry Loading</Text>
               </Pressable>
               <Pressable onPress={loadFromUrl}>
-                <Text style={[styles.link, { color: colors.tint }]}>Re-download model…</Text>
+                <Text style={styles.link}>Re-download model…</Text>
               </Pressable>
             </>
           ) : (
             <Pressable
-              style={[styles.primary, { backgroundColor: colors.tint }]}
+              style={[styles.primary, styles.primaryGlow]}
               onPress={loadFromUrl}
             >
               <Text style={styles.primaryText}>
@@ -89,11 +87,11 @@ export function ModelDownloadGate({ children }: { children: ReactNode }) {
               </Text>
             </Pressable>
           )}
-          <Text style={[styles.pathLabel, { color: colors.textSecondary }]} numberOfLines={3}>
+          <Text style={styles.pathLabel} numberOfLines={3}>
             {displayPath}
           </Text>
           <Pressable onPress={handlePickFile}>
-            <Text style={[styles.link, { color: colors.tint }]}>Use a local file…</Text>
+            <Text style={styles.link}>Use a local file…</Text>
           </Pressable>
         </View>
       )}
@@ -113,11 +111,13 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: '700',
     letterSpacing: -1,
+    color: Colors.light.neonCyan,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
     marginBottom: 16,
+    color: Colors.light.textSecondary,
   },
   error: {
     color: '#EF4444',
@@ -135,6 +135,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: Colors.light.tint,
+  },
+  primaryGlow: {
+    shadowColor: Colors.light.neonCyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+    shadowOpacity: 0.6,
+    elevation: 8,
   },
   primaryText: {
     color: '#FFFFFF',
@@ -144,11 +152,13 @@ const styles = StyleSheet.create({
   link: {
     fontSize: 15,
     fontWeight: '500',
+    color: Colors.light.tint,
   },
   pathLabel: {
     fontSize: 11,
     textAlign: 'center',
     fontFamily: 'monospace',
+    color: Colors.light.textSecondary,
   },
   progressSection: {
     width: '100%',
@@ -158,6 +168,7 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 14,
     fontWeight: '500',
+    color: Colors.light.text,
   },
   track: {
     width: '100%',
